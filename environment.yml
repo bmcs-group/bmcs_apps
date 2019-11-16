@@ -4,4 +4,4 @@ dependencies:
   - appmode
   - matplotlib
   - numpy
-  - scipy
+  - sympy
