@@ -2,3 +2,6 @@ channels:
   - conda-forge
 dependencies:
   - appmode
+  - matplotlib
+  - numpy
+  - scipy
