@@ -1,3 +1,4 @@
+name: bmcsapps
 channels:
   - conda-forge
 dependencies:
@@ -6,3 +7,5 @@ dependencies:
   - numpy
   - sympy
   - ipywidgets
+  - rise
+
