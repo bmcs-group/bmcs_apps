@@ -31,13 +31,11 @@ import matplotlib.pyplot as plt
 class PlotModel(tr.HasTraits):
     itr = tr.WeakRef
 
-    model = tr.WeakRef
+    model = tr.Type
     
-    def init_fields(self):
+    def init_fields(self, *params):
         model = self.model
         itr = self.itr
-        values = itr.trait_get(interact=True)
-        params = list( values[py_var] for py_var in itr.py_vars[1:])
         eps_max = model.get_eps_f_x(0,itr.w_max,*params)
         eps_min = model.get_eps_m_x(0,itr.w_max,*params)
         tau_max = float(itr.tau * 2)
@@ -103,28 +101,39 @@ class PlotModel(tr.HasTraits):
         update_filled_plot(itr.ax_tau, self.line_tau, x_range, tau_x, 
                            color='red')
 
-    def init_Pw(self):
+    def init_Pw(self, *params):
         model = self.model
-        values = itr.trait_get(interact=True)
-        params = list( values[py_var] for py_var in itr.py_vars[1:])
+        itr = self.itr
         model = self.model
         w_range = itr.w_range
         self.line_po = plot_filled_var(itr.ax_po, w_range, 
                                        model.get_Pw_pull(w_range, *params),
                         xlabel=r'$w$ [mm]', ylabel=r'$P$ [N]', color='blue')
+        w_L_b_range = model.get_w_L_b(w_range, *params)
+        self.line_po_Lb = plot_filled_var(itr.ax_po, w_L_b_range, 
+                                       model.get_Pw_pull(w_range, *params),
+                                       color='orange', alpha=0.05)
         self.Pw_marker, = itr.ax_po.plot(0,0,marker='o', color='blue')
+        self.Pw_marker_Lb, = itr.ax_po.plot(0,0,marker='o', color='orange')
 
     def update_Pw(self, w, *params):
         model = self.model
+        itr = self.itr
         w_range = itr.w_range
+        w_L_b_current = model.get_w_L_b(w, *params)
+        w_L_b_range = model.get_w_L_b(w_range, *params)
         Pw = model.get_Pw_pull(w_range, *params)
-        self.P_max = Pw[-1]
+        self.P_max = np.max(Pw)
         update_filled_plot(itr.ax_po, self.line_po, w_range, Pw,
                            color='blue', alpha=0.1)
+        update_filled_plot(itr.ax_po, self.line_po_Lb, w_L_b_range, Pw,
+                           color='orange', alpha=0.05)
 
         P = model.get_Pw_pull(w, *params)
         self.Pw_marker.set_ydata(P)
         self.Pw_marker.set_xdata(w) 
+        self.Pw_marker_Lb.set_ydata(P)
+        self.Pw_marker_Lb.set_xdata(w_L_b_current) 
 
 class ModelInteract(tr.HasTraits):
 
@@ -133,37 +142,46 @@ class ModelInteract(tr.HasTraits):
 
     py_vars = tr.List(tr.Str)
     map_py2sp = tr.Dict
+
+    d = tr.Float(0.03, GEO=True)
+    h = tr.Float(0.8, GEO=True) 
     
     # define the free parameters as traits with default, min and max values
-    w = tr.Float(0.0001, min=1e-5, max=1, interact=True)
-    tau = tr.Float(0.5, min=0.01, max=10, interact=True)
-    L_b = tr.Float(200, min=0.01, max=1000, interact=True)
-    E_f = tr.Float(100000, min=0.01, max=300000, interact=True)
-    A_f = tr.Float(20, min=0.01, max=100, interact=True)
-    p = tr.Float(40, min=0.01, max=100, interact=True)
-    E_m = tr.Float(26000, min=0.01, max=30000, interact=True)
-    A_m = tr.Float(100, min=0.01, max=1000, interact=True)
+    w_max = tr.Float(1.0)
+    t = tr.Float(0.0001, min=1e-5, max=1)
+    tau = tr.Float(0.5, interact=True)
+    L_b = tr.Float(200, interact=True)
+    E_f = tr.Float(100000, interact=True)
+    A_f = tr.Float(20, interact=True)
+    p = tr.Float(40, interact=True)
+    E_m = tr.Float(26000, interact=True)
+    A_m = tr.Float(100, interact=True)
 
     n_steps = tr.Int(50)
-    def get_ipw_sliders(self):
+    
+    sliders = tr.Property
+    @tr.cached_property    
+    def _get_sliders(self):
         traits = self.traits(interact=True)
         vals = self.trait_get(interact=True)
-        return { name : ipw.FloatSlider(value=vals[name],
-                                        min=trait.min,
-                                        max=trait.max,
-                                        step=trait.max/self.n_steps,
+        slider_names = self.py_vars[1:]
+        max_vals = {name : getattr(traits,'max', vals[name] * 2)
+                    for name in slider_names}
+        t_slider = {'t': ipw.FloatSlider(1e-5, min=1e-5, max=1, step=0.05,
+                                         description=r'\(t\)')}
+        param_sliders = { name : ipw.FloatSlider(value=vals[name],
+                                        min=1e-5,
+                                        max=max_vals[name],
+                                        step=max_vals[name] / self.n_steps,
                                         description=r'\(%s\)' % self.map_py2sp[name].name)
             for (name, trait) in traits.items()
-        }        
+        }
+        t_slider.update(param_sliders)
+        return t_slider
 
-
-    w_max = tr.Property
-    def _get_w_max(self):
-        w_trait = self.trait('w')
-        return w_trait.max
-
-    w_range = tr.Array(np.float_)
-    def _w_range_default(self):
+    w_range = tr.Property(tr.Array(np.float_), depends_on='w_max')
+    @tr.cached_property
+    def _get_w_range(self):
         return np.linspace(0,self.w_max,50)
   
     x_range = tr.Property(tr.Array(np.float_), depends_on='L_b')
@@ -180,96 +198,138 @@ class ModelInteract(tr.HasTraits):
         self.fig, ((self.ax_po, self.ax_u),(self.ax_eps, self.ax_tau)) = plt.subplots(
             2,2,figsize=(9,5), tight_layout=True
         )
+        values = self.trait_get(interact=True)
+        params = list( values[py_var] for py_var in self.py_vars[1:])
         for mp in self.model_plots:
-            mp.init_field()
-            mp.init_Pw()
+            mp.init_fields(*params)
+            mp.init_Pw(*params)
+        self.ax_po.set_xlim(0, self.w_max*1.05)
 
     def clear_fields(self):
         clear_plot(self.ax_po, self.ax_u, self.ax_eps,self.ax_tau)
 
-    def update_fields(self, w, **values):
+    def update_fields(self, t, **values):
+        w = t * self.w_max
         self.trait_set(**values)
         params = list( values[py_var] for py_var in self.py_vars[1:])
-        
+        L_b = self.L_b
         self.clear_fields()
         for mp in self.model_plots:
             mp.update_fields(w, *params)
             mp.update_Pw(w, *params)
 
         P_max = np.max(np.array([m.P_max for m in self.model_plots]))
-        self.ax_po.set_ylim(0, P_max*1.1)
+        self.ax_po.set_ylim(0, P_max*1.05)
+        self.ax_po.set_xlim(0, self.w_max*1.05)
         u_min = np.min(np.array([m.u_min for m in self.model_plots]))
         u_max = np.max(np.array([m.u_max for m in self.model_plots] + [1]))
         self.ax_u.set_ylim(u_min, u_max*1.1)
+        self.ax_u.set_xlim(xmin=-1.05*L_b, xmax=0.05*L_b )
         eps_min = np.min(np.array([m.eps_min for m in self.model_plots]))
         eps_max = np.max(np.array([m.eps_max for m in self.model_plots]))
         self.ax_eps.set_ylim(eps_min, eps_max*1.1)
+        self.ax_eps.set_xlim(xmin=-1.05*L_b, xmax=0.05*L_b )
         self.ax_tau.set_ylim(0, self.tau*1.1)
+        self.ax_tau.set_xlim(xmin=-1.05*L_b, xmax=0.05*L_b )
         self.fig.canvas.draw_idle()
+
+    def set_w_max_fields(self, w_max):
+        self.w_max = w_max
+        values = {name: slider.value for name, slider in self.sliders.items()}
+        self.update_fields(**values)
 
     def interact_fields(self):
         self.init_fields()
-        sliders = self.get_ipw_sliders()
+        self.on_w_max_change = self.update_fields
+        sliders = self.sliders
         out = ipw.interactive_output(self.update_fields, sliders);
-        layout = ipw.Layout(grid_template_columns='1fr 1fr')
-        sliders_list = [sliders[py_var] for py_var in self.py_vars]
-        grid = ipw.GridBox(sliders_list, layout=layout)
-        box = ipw.VBox([grid, out])
-        display(box)
+        self.widget_layout(out)
 
     #===========================================================================
     # Interaction on the pull-out curve spatial plot
     #===========================================================================
     def init_geometry(self):
-        fig, (self.ax_po, self.ax_geo) = plt.subplots(1,2,figsize=(8,3.4)) #, tight_layout=True)
+        self.fig, (self.ax_po, self.ax_geo) = plt.subplots(1,2,figsize=(8,3.4)) #, tight_layout=True)
+        values = self.trait_get(interact=True)
+        params = list( values[py_var] for py_var in self.py_vars[1:])
         h=self.h
         d=self.d
         x_C = np.array([[-1, 0], [0,0],[0, h], [-1, h]], dtype=np.float_)
-        self.line_C, = self.ax_geo.fill(*x_C.T, color='gray', alpha=0.2)
+        self.line_C, = self.ax_geo.fill(*x_C.T, color='gray', alpha=0.3)
         for mp in self.model_plots:
+            mp.line_aw, = self.ax_geo.fill([],[], color='white', alpha=1)
             mp.line_F, = self.ax_geo.fill([],[], color='black', alpha=0.8)
             mp.line_F0, = self.ax_geo.fill([],[], color='white', alpha=1)
+            mp.init_Pw(*params)
+        self.ax_po.set_xlim(0, self.w_max*1.05)
 
     def clear_geometry(self):
         clear_plot(self.ax_po, self.ax_geo)
 
-    def update_geometry(self, **values):
-        params = list( values[py_var] for py_var in self.py_vars)
+    def update_geometry(self, t, **values):
+        w = t * self.w_max
+        self.clear_geometry()
+        self.trait_set(**values)
+        params = list( values[py_var] for py_var in self.py_vars[1:])
         h = self.h
         d = self.d
-        w = self.w
         L_b = self.L_b
         f_top = h / 2 + d / 2
         f_bot = h / 2 - d / 2
-        self.ax_geo.set_xlim(xmin=-1.1*L_b, xmax=max( 1.1*w, self.w_max) )
+        self.ax_geo.set_xlim(xmin=-1.05*L_b, xmax=max( 0.05*L_b, 1.1*self.w_max) )
         x_C = np.array([[-L_b, 0], [0,0],[0, h], [-L_b, h]], dtype=np.float_)
         self.line_C.set_xy(x_C)
-        for m in self.models:
-            w_L_b = m.get_w_L_b(*params)
+        for mp in self.model_plots:
+            a_val = mp.model.get_aw_pull(w, *params)
+            width = d * 0.5
+            x_a = np.array([[a_val, f_bot-width],[0, f_bot-width],
+                            [0,f_top+width],[a_val, f_top+width]],
+                           dtype=np.float_)
+            mp.line_aw.set_xy(x_a)
+
+            w_L_b = mp.model.get_w_L_b(w, *params)
             x_F = np.array([[-L_b+w_L_b, f_bot],[w,f_bot],
                             [w,f_top],[-L_b+w_L_b,f_top]], dtype=np.float_)
-            m.line_F.set_xy(x_F)
+            mp.line_F.set_xy(x_F)
             x_F0 = np.array([[-L_b, f_bot],[-L_b+w_L_b,f_bot],
                              [-L_b+w_L_b,f_top],[-L_b,f_top]], dtype=np.float_)
-            m.line_F0.set_xy(x_F0)
+            mp.line_F0.set_xy(x_F0)
+            
             mp.update_Pw(w, *params)
 
-        P_max = np.max(np.array([m.P_max for m in self.model_plots]))
+        P_max = np.max(np.array([mp.P_max for mp in self.model_plots]))
         self.ax_po.set_ylim(0, P_max*1.1)
+        self.ax_po.set_xlim(0, self.w_max*1.05)
         self.fig.canvas.draw_idle()
 
+    def set_w_max(self, w_max):
+        self.w_max = w_max
+        values = {name: slider.value for name, slider in self.sliders.items()}
+        self.on_w_max_change(**values)
+        
+    on_w_max_change = tr.Callable
+    
     def interact_geometry(self):
         self.init_geometry()
-        sliders = self.get_ipw_sliders()
+        self.on_w_max_change = self.update_geometry
+        sliders = self.sliders
         out = ipw.interactive_output(self.update_geometry, sliders);
+        self.widget_layout(out)
+
+    def widget_layout(self, out):
+        sliders = self.sliders
         layout = ipw.Layout(grid_template_columns='1fr 1fr')
-        sliders_list = [sliders[py_var] for py_var in py_vars]
-        grid = ipw.GridBox(sliders_list, layout=layout)
-        model_version = ipw.Dropdown(
-            options=['1', '2', '3'],
-            value='2',
-            description='Model version:',
-            disabled=False,
+        param_sliders_list = [sliders[py_var] for py_var in self.py_vars[1:]]
+        t_slider = sliders['t']
+        grid = ipw.GridBox(param_sliders_list, layout=layout)
+        w_max_text = ipw.FloatText(
+            value=self.w_max,
+            description=r'w_max',
+            disabled=False
         )
-        box = ipw.VBox([model_version, grid, out])
+        out_w_max = ipw.interactive_output(self.set_w_max, 
+                                           {'w_max':w_max_text})
+
+        hbox = ipw.HBox([t_slider, w_max_text])
+        box = ipw.VBox([hbox, grid, out, out_w_max])
         display(box)
