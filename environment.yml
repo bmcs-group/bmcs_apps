@@ -1,16 +1,16 @@
 name: bmcsapps
 channels:
-  - conda-forge
+- conda-forge
 dependencies:
-  - appmode
-  - traits
-  - matplotlib
-  - numpy
-  - sympy
-  - ipywidgets
-  - rise
-  - pip
-    pip:
-    - bmcs
+- appmode
+- traits
+- matplotlib
+- numpy
+- sympy
+- ipywidgets
+- rise
+- pip
+- pip:
+  - bmcs
 
 
