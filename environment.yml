@@ -9,4 +9,8 @@ dependencies:
   - sympy
   - ipywidgets
   - rise
+  - pip
+    pip:
+    - bmcs
+
 
