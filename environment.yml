@@ -10,6 +10,7 @@ dependencies:
 - scipy
 - ipywidgets
 - rise
+- traitsui
 - pip
 - pip:
   - bmcs
