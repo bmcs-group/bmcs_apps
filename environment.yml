@@ -12,6 +12,7 @@ dependencies:
 - rise
 - traitsui
 - pyqt
+- pyface
 - pip
 - pip:
   - bmcs
