@@ -15,6 +15,7 @@ dependencies:
 - traitsui
 - pyqt
 - pyface
+- ipyml
 - mayavi
 - pip
 - pip:
