@@ -13,8 +13,4 @@ is the fragmentation.ipynb notebook.
 ## Binder
 The notebook can be open also in the clouds without any local installation
 using the binder service. It takes a while for the repository image to build up.
-[![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/rosoba/bmcs_fragmentation.git/master?filepath=fragmentation.ipynb)
-
-
-
-
+[![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/rosoba/bmcsapps.git/master?filepath=index.ipynb)
