@@ -1,9 +1,8 @@
-name: bmcsapps
+name: base
 channels:
 - conda-forge
 dependencies:
 - appmode
-- rise
 - jupyter_contrib_nbextensions
 - traits
 - matplotlib
@@ -11,13 +10,10 @@ dependencies:
 - sympy
 - scipy
 - ipywidgets
-- rise
 - traitsui
-- pyqt
-- pyface
-- mayavi
 - pip
 - pip:
-  - bmcs
-
-
+  - bmcs_utils
+  - bmcs_ibvpy
+  - bmcs_cross_section
+  - bmcs_beam

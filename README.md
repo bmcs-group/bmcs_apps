@@ -1,4 +1,4 @@
-# bmcsapps
+# bmcs_apps
 
 ## Focus
 The repository contains a jupyter notebook explaining and demonstrating 
